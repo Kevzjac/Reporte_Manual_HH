@@ -682,7 +682,7 @@
             <div class="config-section">
                 <h3>Configuración de Sincronización</h3>
                 <p><strong>Estado actual:</strong> <span id="config-status">Conectado a base de datos centralizada</span></p>
-                <p><strong>URL de Google Sheets:</strong> <span id="sheets-url">https://docs.google.com/spreadsheets/d/1ABC123...</span></p>
+                <p><strong>URL de Google Sheets:</strong> <span id="sheets-url">https://docs.google.com/spreadsheets/d/...</span></p>
                 <p><strong>Última sincronización:</strong> <span id="last-sync">Hace 2 minutos</span></p>
                 <p><strong>Registros almacenados:</strong> <span id="total-records">0 registros</span></p>
                 
@@ -764,8 +764,8 @@
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     
                     // En un caso real, aquí iría el código para conectar con Google Sheets API
-                    // const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Registros?key=${API_KEY}`);
-                    // const data = await response.json();
+                     const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Registros?key=${API_KEY}`);
+                     const data = await response.json();
                     
                     // Por ahora, simulamos que siempre funciona
                     updateSyncStatus(true);
@@ -792,12 +792,12 @@
                     await new Promise(resolve => setTimeout(resolve, 500));
                     
                     // En un caso real, aquí se enviaría el dato a Google Sheets
-                    // const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Registros:append?valueInputOption=RAW&key=${API_KEY}`, {
-                    //     method: 'POST',
-                    //     body: JSON.stringify({
-                    //         values: [Object.values(data)]
-                    //     })
-                    // });
+                     const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Registros:append?valueInputOption=RAW&key=${API_KEY}`, {
+                         method: 'POST',
+                         body: JSON.stringify({
+                             values: [Object.values(data)]
+                         })
+                     });
                     
                     // Por ahora, solo guardamos localmente
                     saveToLocalStorage(data);
@@ -1375,3 +1375,4 @@
     </script>
 </body>
 </html>
+
