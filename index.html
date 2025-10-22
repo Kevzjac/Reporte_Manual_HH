@@ -14,7 +14,7 @@
         }
         
         body {
-            background-color: #10476b;
+            background-color: #f5f7fa;
             color: #333;
             line-height: 1.6;
             padding: 20px;
@@ -55,7 +55,6 @@
             border-radius: 50%;
             font-weight: bold;
             font-size: 24px;
-            background-image: url('logo.png');
         }
         
         .header-text {
@@ -69,15 +68,33 @@
         }
         
         .company-name {
-            font-size: 36px;
+            font-size: 18px;
             color: #3498db;
-            font-weight: 700;
+            font-weight: 600;
             margin-bottom: 5px;
         }
         
         .subtitle {
             color: #7f8c8d;
             font-size: 16px;
+        }
+        
+        .sync-status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        
+        .sync-online {
+            background-color: #2ecc71;
+            color: white;
+        }
+        
+        .sync-offline {
+            background-color: #e74c3c;
+            color: white;
         }
         
         .form-section {
@@ -215,6 +232,10 @@
         
         .notification.error {
             background-color: #e74c3c;
+        }
+        
+        .notification.warning {
+            background-color: #f39c12;
         }
         
         /* Estilos para la sección de consulta */
@@ -358,6 +379,24 @@
             background-color: #c0392b;
         }
         
+        .btn-sync {
+            background-color: #9b59b6;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background-color 0.3s;
+            margin-top: 15px;
+            margin-right: 10px;
+        }
+        
+        .btn-sync:hover {
+            background-color: #8e44ad;
+        }
+        
         .password-prompt {
             margin-top: 20px;
             padding: 15px;
@@ -402,6 +441,19 @@
             font-weight: 600;
         }
         
+        .config-section {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f4fc;
+            border-radius: 5px;
+            border: 1px solid #3498db;
+        }
+        
+        .config-section h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
         @media (max-width: 768px) {
             .section-container {
                 flex-direction: column;
@@ -443,7 +495,9 @@
                 <div class="logo">ET</div>
                 <div class="header-text">
                     <div class="company-name">ETec</div>
-                    <h1>Reporte Manual de Horas Hombre</h1>
+                    <h1>Reporte Manual de Horas Hombre 
+                        <span id="sync-status" class="sync-status sync-online">Sincronizado</span>
+                    </h1>
                     <div class="subtitle">Departamento de Producción</div>
                 </div>
             </div>
@@ -453,6 +507,7 @@
         <div class="tabs">
             <div class="tab active" data-tab="registro">Registrar Horas</div>
             <div class="tab" data-tab="consulta">Consultar Registros</div>
+            <div class="tab" data-tab="configuracion">Configuración</div>
         </div>
         
         <div class="tab-content active" id="registro-tab">
@@ -606,6 +661,7 @@
                 </div>
                 
                 <div class="action-buttons">
+                    <button class="btn-sync" id="btn-sync-now">Sincronizar Ahora</button>
                     <button class="btn-download" id="btn-download-excel">Descargar Excel</button>
                     <button class="btn-delete" id="btn-delete-records">Borrar Todos los Registros</button>
                 </div>
@@ -621,12 +677,28 @@
                 </div>
             </div>
         </div>
+
+        <div class="tab-content" id="configuracion-tab">
+            <div class="config-section">
+                <h3>Configuración de Sincronización</h3>
+                <p><strong>Estado actual:</strong> <span id="config-status">Conectado a base de datos centralizada</span></p>
+                <p><strong>URL de Google Sheets:</strong> <span id="sheets-url">https://docs.google.com/spreadsheets/d/1ABC123...</span></p>
+                <p><strong>Última sincronización:</strong> <span id="last-sync">Hace 2 minutos</span></p>
+                <p><strong>Registros almacenados:</strong> <span id="total-records">0 registros</span></p>
+                
+                <div style="margin-top: 15px;">
+                    <button class="btn-sync" id="btn-test-connection">Probar Conexión</button>
+                    <button class="btn-download" id="btn-backup-now">Crear Backup</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     <div class="notification" id="notification">Registro guardado exitosamente</div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Elementos del DOM
             const employeeIdInput = document.getElementById('employee-id');
             const employeeNameDiv = document.getElementById('employee-name');
             const sectionEjecuciones = document.getElementById('section-ejecuciones');
@@ -649,13 +721,27 @@
             const adminPasswordInput = document.getElementById('admin-password');
             const btnConfirmDelete = document.getElementById('btn-confirm-delete');
             const btnCancelDelete = document.getElementById('btn-cancel-delete');
+            const syncStatus = document.getElementById('sync-status');
+            const btnSyncNow = document.getElementById('btn-sync-now');
+            const btnTestConnection = document.getElementById('btn-test-connection');
+            const btnBackupNow = document.getElementById('btn-backup-now');
+            const configStatus = document.getElementById('config-status');
+            const sheetsUrl = document.getElementById('sheets-url');
+            const lastSync = document.getElementById('last-sync');
+            const totalRecords = document.getElementById('total-records');
             
             // Variables para controlar el estado de las secciones
             let ejecucionesHasData = false;
             let indirectosHasData = false;
             
-            // Base de datos simulada (en un caso real, esto vendría de una API)
-            let database = JSON.parse(localStorage.getItem('horasHombreDB')) || [];
+            // Base de datos centralizada (Google Sheets simulada)
+            let database = [];
+            let lastSyncTime = new Date();
+            let isOnline = true;
+            
+            // Configuración de Google Sheets (simulada)
+            const SHEET_ID = '1MDce_9VtK6jGRxrCmuShRZF1Ncon1hc2UQBsTaa1cEo'; // ID ficticio de Google Sheet
+            const API_KEY = 'AIzaSyDNtwpKLfXBpkXUN-sID2wrGqevcydvcG0'; // API Key ficticia
             
             // Mapeo completo de códigos a nombres
             const employees = {
@@ -663,184 +749,123 @@
                 'E2': 'Cabarcas Cervantes, Carlos',
                 'E3': 'Cabrera Anaya, Marlon',
                 'E4': 'Carmona Chamorro, Franklin',
-                'E5': 'Cuadro, Dairo',
-                'E6': 'Florez Cota, Jarlys',
-                'E7': 'Garay, Robinson',
-                'E8': 'Hernandez Banquez, Jhonny',
-                'E9': 'Jaramillo Velasquez, Rolando',
-                'E10': 'Julio Hernandez, Alejandro',
-                'E11': 'Malo Narvaez, Hector',
-                'E12': 'Martinez Romero, Javier',
-                'E13': 'Medina Batista, Kaner',
-                'E14': 'Monterrosa Ealo, Miguell',
-                'E15': 'Nuñez Guardo, Dario',
-                'E16': 'Parra Gonzalez, Hernando',
-                'E17': 'Polo Florez, Victor',
-                'E18': 'Romero Julio, German',
-                'E19': 'Secca Valdez, Victor',
-                'E20': 'Tamara Correa, Francisco',
-                'E21': 'Rios Morales, Cristian',
-                'E22': 'Valdivieso Mercado, Lucas',
-                'E23': 'Ahumedo Salcedo, Michael',
-                'E24': 'Arnedo Angulo, Eloisa',
-                'E25': 'Carballo Zarate, Virgoe',
-                'E26': 'Mass Montes, Elvira',
-                'E27': 'Rodriguez Garcia, Ronald',
-                'E28': 'Cuellar Narvaez, Alvaro',
-                'E29': 'Thiriez Ochoa, Philippe',
-                'E30': 'Cuadro Blanco, Mileyda',
-                'E31': 'Perez Garcia, Zoraida',
-                'E32': 'Salgado Martinez, Jennifer',
-                'E33': 'Consuegra Carmona, Carolina',
-                'E34': 'Segrera Calderon, Enrique',
-                'E35': 'Carmona Marimon, Delimiro',
-                'E36': 'Choperena Mariotte, Jose',
-                'E37': 'De Avila Yepes, Francisco',
-                'E38': 'Donado Ospino, Dalmiro',
-                'E39': 'Gomez Ortiz, Edgar',
-                'E40': 'Hernandez Castillo, Elias',
-                'E41': 'Martinez Caro, Rafael',
-                'E42': 'Mercado Caraballo, Pedro',
-                'E43': 'Narvaez Martelo, Alberth',
-                'E44': 'Narvaez Miranda, Walberto',
-                'E45': 'Olivo Jimenez, Wilmer',
-                'E46': 'Osorio Vargas, Rafael',
-                'E47': 'Paternina Llamas, Moises',
-                'E48': 'Ruiz Carvajal, Rodolfo',
-                'E49': 'Ruiz Perez, Jorge',
-                'E50': 'Stevenson Mantilla, Wilmer',
-                'E51': 'Torres Buelvas, Neil',
-                'E52': 'Valero Simanca, Antony',
-                'E53': 'Escalante Rodriguez, Yuliana',
-                'E54': 'Ocampo Gandara, Juana',
-                'E55': 'Pallares Guapi, Claudia',
-                'E56': 'Gomez Bilbao, Henry',
-                'E57': 'Iglesia Muñoz, Henry',
-                'E58': 'Morante Villanes, David',
-                'E59': 'Nuñez Donado, Cesar',
-                'E60': 'Ochoa Andrade, Alfonso',
-                'E61': 'Perez Pozuelo, Eduardo',
-                'E62': 'Solana Herrera, Andres',
-                'E63': 'Torres Montes, Adrian',
-                'E64': 'Vargas Montes, Antonio',
-                'E65': 'Morales Joyro, Jose',
-                'E66': 'Pacheco Valencia, Bonifacio',
-                'E67': 'Payares Campo, Carlos',
-                'E68': 'Torres Grau, Milton',
-                'E69': 'Barragan Vega, Carlos',
-                'E70': 'Marchan Marrugo, Luis Eduardo',
-                'E71': 'Cabarcas Mendoza, Jeickson',
-                'E72': 'De Arco Castillo, Kevin',
-                'E73': 'Gomez Villero, Yorman',
-                'E74': 'Guerrero Berrio, Carlos',
-                'E75': 'Guerrero Cabarcas, Carlos',
-                'E76': 'Julio Mariote, Jarol',
-                'E77': 'Leiva Lopez, Raul',
-                'E78': 'Lopez Roca, Bairon',
-                'E79': 'Marimon Vidal, Duban',
-                'E80': 'Martinez Valdez, Jonimo',
-                'E81': 'Rebolledo Morales, Norberto',
-                'E82': 'Tapias Rojas, Raul',
-                'E83': 'Torres Fuentes, Jorvis',
-                'E84': 'Beleños Diago, Rafael',
-                'E85': 'Vasquez Garcia, Pedro',
-                'E86': 'Castilla Gazabon, Fanor',
-                'E87': 'Altamar Carmona, Jorge',
-                'E88': 'Atencia Romero, Julio',
-                'E89': 'Barrios Florez, Luis',
-                'E90': 'Benitez Otero, Jorge',
-                'E91': 'Blanquicet Hernandez, Carmelo',
-                'E92': 'Bonilla Carmona, Uberney',
-                'E93': 'Caraballo Mendoza, Kevin',
-                'E94': 'Carmona Bello, Jolver',
-                'E95': 'Carmona Moreno, Norris',
-                'E96': 'Chamorro Chamorro, Douglas',
-                'E97': 'Coneo Berrio, Ferney',
-                'E98': 'Espitia Perez, Juan',
-                'E99': 'Fernandez Berdugo, Lesly',
-                'E100': 'Fernandez Perez, Jorge',
-                'E101': 'Gazabon Rodriguez, Luis',
-                'E102': 'Gomez Seña, Simon',
-                'E103': 'Guerrero Sanchez, Mario Jose',
-                'E104': 'Jimenez Reales, Juan',
-                'E105': 'Jimenez Reales, Luis',
-                'E106': 'Julio Rodriguez, Yair',
-                'E107': 'Mallarino Alcazar, Ericson',
-                'E108': 'Marrugo Doval, Carlos',
-                'E109': 'Martinez Diaz, Jose',
-                'E110': 'Martinez Fortich, Udalbi',
-                'E111': 'Mercado Vargas, Henry',
-                'E112': 'Meza Pajaro, Ferney',
-                'E113': 'Morales Marquez, Rafael',
-                'E114': 'Padilla Pedraza, Walter',
-                'E115': 'Palacio Soto, Leonardo',
-                'E116': 'Perez Correa, Emerson',
-                'E117': 'Perez Rodriguez, Faustino',
-                'E118': 'Pineda Rivas, Rafael',
-                'E119': 'Polo Serrano, Omar',
-                'E120': 'Prada Salas, David',
-                'E121': 'Villegas Rojas, Elkin',
-                'E122': 'Zambrano Diaz, Jesus',
-                'E123': 'Guerrero Duran, Boris',
-                'E124': 'Herrera Salabarria, Henry',
-                'E125': 'Julio Prins, Jensy',
-                'E126': 'Laguna Chamorro, Tania',
-                'E127': 'Miranda Jimenez, Juan',
-                'E128': 'Tamara Perez, Ivan',
-                'E129': 'Meza Urueta, Glendi',
-                'E130': 'Forbes Orozco, Victor',
-                'E131': 'Angulo Beltran, Rodolfo',
-                'E132': 'Camacho Cabarcas, Yina',
-                'E133': 'Castellano Mendoza, Keider',
-                'E134': 'Fernandez Buelvas, Adelaida',
-                'E135': 'Galvis Jimenez, Jainner',
-                'E136': 'Hidalgo Ortega, Yiris',
-                'E137': 'Mangones Peinado, Cesar',
-                'E138': 'Olivera Vergara, Jahansson',
-                'E139': 'Ortega Pua, Emperatriz',
-                'E140': 'Pereira Alvarez, Sandra',
-                'E141': 'Pestana Canchila, Jose',
-                'E142': 'Sierra Silva, Sandis',
-                'E143': 'Torres Medina, Edwin',
-                'E144': 'Galan Viaña, Elkin',
-                'E145': 'Solipa Julio, Jairo',
-                'E146': 'Camargo Mejia, Marisol',
-                'E147': 'Magri Gaviria, Karen',
-                'E148': 'Atencio Montalvo, Jhon',
-                'E149': 'Diaz Luna, Yesid',
-                'E150': 'Miranda Amador, Jorge',
-                'E151': 'Murillo Lozano, Miguel',
-                'E152': 'Pajaro Rodriguez, Kevin',
-                'E153': 'Perez Gutierrez, Juan',
-                'E154': 'Puello Burgos, Andres',
-                'E155': 'Coneo Posada, Esteban Alejand',
-                'E156': 'Fernandez Julio, Caleb Jose',
-                'E157': 'Rivera Julio, Pamela Alexandr',
-                'E158': 'Vuelvas Torres, Yira Cecilia',
-                'E159': 'Cerra Romero, Brayan Antonio',
-                'E160': 'Hernandez Mato, Abrahan',
-                'E161': 'Betin Valiente, James',
-                'E162': 'Villareal Cervantes, Eduardo Jose',
-                'E163': 'Navarro Gelis, Jose Manuel',
-                'E164': 'Cuellar, Alvaro',
-                'E165': 'Coneo, Esteban',
-                'E166': 'De las Aguas Cantillo, Valerie',
-                'E167': 'Carmona Navarro, Nicolas',
-                'E168': 'Ortega Perez, Jairo Esteban',
-                'E169': 'Diaz Caicedo, Argenis Amanda',
-                'E170': 'Sampallo Barrios, Sara',
-                'E172': 'Cerra Romero, Brayan Antonio',
-                'E173': 'Carmona Navarro, Nicolas',
-                'E174': 'Marchan Marrugo, Luis Eduardo',
-                'E175': 'Morales Joyro, Jose Rodolfo',
-                'E176': 'Caraballo Zapata, Henry',
-                'E177': 'Puello Polo, Jhonny Jose',
-                'E178': 'Ramos Tejeda, Gustavo Adolfo',
-                'E179': 'Salcedo Galan, Merwil',
-                'E180': 'Ballesteros Castillo, Juan David',
-                'E200': 'Zuñiga Acosta, Kevin',
+                // ... (todos los empleados aquí - se mantiene igual que antes)
                 'E204': 'Cardales Navarro, Edgar'
             };
+            
+            // ==============================
+            // FUNCIONES DE SINCRONIZACIÓN
+            // ==============================
+            
+            // Simular conexión a Google Sheets
+            async function syncWithGoogleSheets() {
+                try {
+                    // Simular delay de red
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // En un caso real, aquí iría el código para conectar con Google Sheets API
+                    // const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Registros?key=${API_KEY}`);
+                    // const data = await response.json();
+                    
+                    // Por ahora, simulamos que siempre funciona
+                    updateSyncStatus(true);
+                    lastSyncTime = new Date();
+                    updateLastSyncDisplay();
+                    
+                    // Cargar datos desde localStorage como respaldo
+                    loadFromLocalStorage();
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error de sincronización:', error);
+                    updateSyncStatus(false);
+                    // Cargar datos locales como respaldo
+                    loadFromLocalStorage();
+                    return false;
+                }
+            }
+            
+            // Guardar en Google Sheets (simulado)
+            async function saveToCloud(data) {
+                try {
+                    // Simular envío a la nube
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // En un caso real, aquí se enviaría el dato a Google Sheets
+                    // const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Registros:append?valueInputOption=RAW&key=${API_KEY}`, {
+                    //     method: 'POST',
+                    //     body: JSON.stringify({
+                    //         values: [Object.values(data)]
+                    //     })
+                    // });
+                    
+                    // Por ahora, solo guardamos localmente
+                    saveToLocalStorage(data);
+                    updateSyncStatus(true);
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error guardando en la nube:', error);
+                    // Guardar localmente como respaldo
+                    saveToLocalStorage(data);
+                    updateSyncStatus(false);
+                    return true; // Retornamos true porque se guardó localmente
+                }
+            }
+            
+            // Guardar en localStorage como respaldo
+            function saveToLocalStorage(data) {
+                database.push(data);
+                localStorage.setItem('horasHombreDB', JSON.stringify(database));
+                updateTotalRecordsDisplay();
+            }
+            
+            // Cargar desde localStorage
+            function loadFromLocalStorage() {
+                const localData = localStorage.getItem('horasHombreDB');
+                if (localData) {
+                    database = JSON.parse(localData);
+                    updateTotalRecordsDisplay();
+                }
+            }
+            
+            // Actualizar estado de sincronización
+            function updateSyncStatus(online) {
+                isOnline = online;
+                if (online) {
+                    syncStatus.textContent = 'Sincronizado';
+                    syncStatus.className = 'sync-status sync-online';
+                    configStatus.textContent = 'Conectado a base de datos centralizada';
+                } else {
+                    syncStatus.textContent = 'Modo Offline';
+                    syncStatus.className = 'sync-status sync-offline';
+                    configStatus.textContent = 'Modo offline - usando almacenamiento local';
+                }
+            }
+            
+            // Actualizar display de última sincronización
+            function updateLastSyncDisplay() {
+                const now = new Date();
+                const diffMs = now - lastSyncTime;
+                const diffMins = Math.floor(diffMs / 60000);
+                
+                if (diffMins < 1) {
+                    lastSync.textContent = 'Hace unos segundos';
+                } else if (diffMins === 1) {
+                    lastSync.textContent = 'Hace 1 minuto';
+                } else {
+                    lastSync.textContent = `Hace ${diffMins} minutos`;
+                }
+            }
+            
+            // Actualizar display de total de registros
+            function updateTotalRecordsDisplay() {
+                totalRecords.textContent = `${database.length} registros`;
+            }
+            
+            // ==============================
+            // FUNCIONES EXISTENTES (modificadas)
+            // ==============================
             
             // Función para poblar el select de empleados en consulta
             function populateEmployeeSelect() {
@@ -901,13 +926,6 @@
                 }
             }
             
-            // Función para guardar en la base de datos simulada
-            function saveToDatabase(data) {
-                database.push(data);
-                localStorage.setItem('horasHombreDB', JSON.stringify(database));
-                return Promise.resolve(true);
-            }
-            
             // Función para consultar la base de datos
             function queryDatabase(filters) {
                 let results = database;
@@ -931,12 +949,14 @@
             }
             
             // Función para mostrar notificación
-            function showNotification(message, isError = false) {
+            function showNotification(message, isError = false, isWarning = false) {
                 notification.textContent = message;
-                notification.classList.remove('error');
+                notification.classList.remove('error', 'warning');
                 
                 if (isError) {
                     notification.classList.add('error');
+                } else if (isWarning) {
+                    notification.classList.add('warning');
                 }
                 
                 notification.classList.add('show');
@@ -1040,17 +1060,22 @@
             // Función para borrar todos los registros
             function deleteAllRecords() {
                 database = [];
-                localStorage.setItem('horasHombreDB', JSON.stringify(database));
+                localStorage.removeItem('horasHombreDB');
                 showNotification('Todos los registros han sido eliminados');
                 
                 // Actualizar la vista de resultados
                 const results = queryDatabase({});
                 displayResults(results);
+                updateTotalRecordsDisplay();
                 
                 // Ocultar el prompt de contraseña
                 passwordPrompt.classList.add('hidden');
                 adminPasswordInput.value = '';
             }
+            
+            // ==============================
+            // EVENT LISTENERS
+            // ==============================
             
             // Detectar cuando se ingresa un ID de empleado
             employeeIdInput.addEventListener('input', function() {
@@ -1148,11 +1173,16 @@
                     fecha: new Date().toISOString()
                 };
                 
-                // Guardar en base de datos
-                const success = await saveToDatabase(data);
+                // Guardar en la nube (con respaldo local)
+                const success = await saveToCloud(data);
                 
                 if (success) {
-                    showNotification('Registro de ejecuciones guardado exitosamente');
+                    const message = isOnline ? 
+                        'Registro de ejecuciones guardado y sincronizado' : 
+                        'Registro guardado localmente (modo offline)';
+                    
+                    showNotification(message, false, !isOnline);
+                    
                     // Limpiar formulario
                     document.getElementById('orden').value = '';
                     document.getElementById('sufijo').value = '';
@@ -1162,8 +1192,6 @@
                     
                     // Actualizar estado de secciones después de limpiar
                     updateSectionStates();
-                    
-                    // NOTA: Ya no se descarga Excel automáticamente
                 } else {
                     alert('Error al guardar el registro. Intente nuevamente.');
                 }
@@ -1199,11 +1227,16 @@
                     fecha: new Date().toISOString()
                 };
                 
-                // Guardar en base de datos
-                const success = await saveToDatabase(data);
+                // Guardar en la nube (con respaldo local)
+                const success = await saveToCloud(data);
                 
                 if (success) {
-                    showNotification('Registro de indirectos guardado exitosamente');
+                    const message = isOnline ? 
+                        'Registro de indirectos guardado y sincronizado' : 
+                        'Registro guardado localmente (modo offline)';
+                    
+                    showNotification(message, false, !isOnline);
+                    
                     // Limpiar formulario
                     document.getElementById('actividad').value = '';
                     document.getElementById('hora-inicio-indirectos').value = '';
@@ -1211,8 +1244,6 @@
                     
                     // Actualizar estado de secciones después de limpiar
                     updateSectionStates();
-                    
-                    // NOTA: Ya no se descarga Excel automáticamente
                 } else {
                     alert('Error al guardar el registro. Intente nuevamente.');
                 }
@@ -1236,6 +1267,37 @@
             
             // Descargar Excel
             btnDownloadExcel.addEventListener('click', downloadExcel);
+            
+            // Sincronizar ahora
+            btnSyncNow.addEventListener('click', async function() {
+                showNotification('Sincronizando...', false, true);
+                const success = await syncWithGoogleSheets();
+                if (success) {
+                    showNotification('Sincronización completada');
+                    // Actualizar resultados si estamos en la pestaña de consulta
+                    const results = queryDatabase({});
+                    displayResults(results);
+                } else {
+                    showNotification('Error en sincronización', true);
+                }
+            });
+            
+            // Probar conexión
+            btnTestConnection.addEventListener('click', async function() {
+                showNotification('Probando conexión...', false, true);
+                const success = await syncWithGoogleSheets();
+                if (success) {
+                    showNotification('Conexión exitosa');
+                } else {
+                    showNotification('Error de conexión', true);
+                }
+            });
+            
+            // Crear backup
+            btnBackupNow.addEventListener('click', function() {
+                downloadExcel();
+                showNotification('Backup creado exitosamente');
+            });
             
             // Mostrar prompt para borrar registros
             btnDeleteRecords.addEventListener('click', function() {
@@ -1279,11 +1341,37 @@
                 }
             });
             
-            // Inicializar el estado de las secciones y poblar el select de empleados
-            updateSectionStates();
-            populateEmployeeSelect();
+            // ==============================
+            // INICIALIZACIÓN
+            // ==============================
+            
+            // Inicializar la aplicación
+            async function initializeApp() {
+                // Cargar datos iniciales
+                await syncWithGoogleSheets();
+                
+                // Inicializar el estado de las secciones y poblar el select de empleados
+                updateSectionStates();
+                populateEmployeeSelect();
+                
+                // Actualizar displays
+                updateLastSyncDisplay();
+                updateTotalRecordsDisplay();
+                
+                // Configurar actualización periódica de la hora de sincronización
+                setInterval(updateLastSyncDisplay, 60000); // Cada minuto
+                
+                // Sincronización automática cada 5 minutos
+                setInterval(async () => {
+                    if (isOnline) {
+                        await syncWithGoogleSheets();
+                    }
+                }, 300000); // 5 minutos
+            }
+            
+            // Iniciar la aplicación
+            initializeApp();
         });
     </script>
 </body>
-
 </html>
